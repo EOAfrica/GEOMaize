@@ -1,0 +1,6 @@
+.ipynb_checkpoints
+# custom virtual environment
+pyeoaf
+__pycache__
+# large datasets which shouldn't be under git version control but should be downloaded from somewhere else
+data/data_nogit
