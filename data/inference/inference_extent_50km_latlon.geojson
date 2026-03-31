@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "inference_extent_50km_latlon",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "AREA": 0.35062218414758944, "PERIM": 2.3685503819194746, "HEIGHT": 0.59431654777195853, "WIDTH": 0.58995864318777891, "id": "Tamale" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ -0.753649013206423, 9.290296609491181 ], [ -0.753649013206424, 9.740296609491178 ], [ -0.303649013206423, 9.740296609491178 ], [ -0.303649013206423, 9.290296609491183 ], [ -0.753649013206423, 9.290296609491181 ] ] ] } }
+]
+}

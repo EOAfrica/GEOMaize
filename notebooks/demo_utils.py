@@ -1,0 +1,195 @@
+import pandas as pd
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+from openeo_gfmap import BoundingBoxExtent
+from openeo_gfmap import TemporalContext
+from datetime import datetime
+
+def plot_distribution(train_df, test_df, val_df, target_column):
+    # Create a figure with subplots for the value counts including train/test/val splits
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    fig.suptitle('Distribution of Variables by Train/Test/Validation Split', fontsize=16)
+
+    # Define colors for train/test/val
+    colors = ['blue', 'orange', 'green']
+    labels = ['Train', 'Test', 'Val']
+    datasets = [train_df, test_df, val_df]
+
+    # REGION distribution
+    for i, (data, color, label) in enumerate(zip(datasets, colors, labels)):
+        region_counts = data.REGION.value_counts()
+        axes[0, 0].bar(region_counts.index, region_counts.values, alpha=0.7, color=color, label=label)
+    axes[0, 0].set_title('REGION')
+    axes[0, 0].set_xlabel('Region')
+    axes[0, 0].set_ylabel('Count')
+    axes[0, 0].legend()
+
+    # COMMUNITY distribution
+    all_communities = pd.concat(datasets).COMMUNITY.unique()
+    x_pos = range(len(all_communities))
+    for i, (data, color, label) in enumerate(zip(datasets, colors, labels)):
+        community_counts = data.COMMUNITY.value_counts().reindex(all_communities, fill_value=0)
+        axes[0, 1].bar([x + i*0.25 for x in x_pos], community_counts.values, width=0.25, alpha=0.7, color=color, label=label)
+    axes[0, 1].set_title('COMMUNITY')
+    axes[0, 1].set_xlabel('Community')
+    axes[0, 1].set_ylabel('Count')
+    axes[0, 1].set_xticks([x + 0.25 for x in x_pos])
+    axes[0, 1].set_xticklabels(all_communities, rotation=45, ha='right')
+    axes[0, 1].legend()
+
+    # DISTRICT distribution
+    all_districts = pd.concat(datasets).DISTRICT.unique()
+    x_pos_district = range(len(all_districts))
+    for i, (data, color, label) in enumerate(zip(datasets, colors, labels)):
+        district_counts = data.DISTRICT.value_counts().reindex(all_districts, fill_value=0)
+        axes[1, 0].bar([x + i*0.25 for x in x_pos_district], district_counts.values, width=0.25, alpha=0.7, color=color, label=label)
+    axes[1, 0].set_title('DISTRICT')
+    axes[1, 0].set_xlabel('District')
+    axes[1, 0].set_ylabel('Count')
+    axes[1, 0].set_xticks([x + 0.25 for x in x_pos_district])
+    axes[1, 0].set_xticklabels(all_districts, rotation=45, ha='right')
+    axes[1, 0].legend()
+
+    # YEAR distribution
+    all_years = sorted(pd.concat(datasets).year.unique())
+    x_pos_year = range(len(all_years))
+    for i, (data, color, label) in enumerate(zip(datasets, colors, labels)):
+        year_counts = data.year.value_counts().reindex(all_years, fill_value=0)
+        axes[1, 1].bar([x + i*0.25 for x in x_pos_year], year_counts.values, width=0.25, alpha=0.7, color=color, label=label)
+    axes[1, 1].set_title('YEAR')
+    axes[1, 1].set_xlabel('Year')
+    axes[1, 1].set_ylabel('Count')
+    axes[1, 1].set_xticks([x + 0.25 for x in x_pos_year])
+    axes[1, 1].set_xticklabels(all_years)
+    axes[1, 1].legend()
+
+    # Yield kg/H histogram with bars next to each other
+    bin_edges = np.histogram_bin_edges(
+        pd.concat([train_df[target_column], test_df[target_column], val_df[target_column]]).dropna(), bins=20
+    )
+
+    width = 0.25
+    # Plot histogram for Yield kg/H for each split using the same bin edges
+    for i, (data, color, label) in enumerate(zip(datasets, colors, labels)):
+        hist, _ = np.histogram(data[target_column].dropna(), bins=bin_edges)
+        # Use bin centers for bar positions
+        bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+        axes[0, 2].bar(bin_centers + i*width - width, hist, width=width, alpha=0.7, color=color, label=label, align='center')
+        # x_ticks = [bin_centers + i*width]
+    axes[0, 2].set_title('Yield kg/H')
+    axes[0, 2].set_xlabel('Yield kg/H')
+    # axes[0, 2].set_xticks(x_ticks)
+    axes[0, 2].set_xticklabels(['', '', 'Low', '', '', '', 'High', ''])
+    axes[0, 2].set_ylabel('Frequency')
+    axes[0, 2].legend()
+
+    # Bin mean yield and std plot
+    bin_labels = ['Low', 'High'] if 'bin' in train_df.columns else train_df['bin'].unique().astype(str)
+    x = np.arange(len(bin_labels))
+    for idx, (data, color, label) in enumerate(zip(datasets, colors, labels)):
+        bin_means = data.groupby('bin')['Yield kg/H'].mean().reindex([0,1], fill_value=0)
+        bin_stds = data.groupby('bin')['Yield kg/H'].std().reindex([0,1], fill_value=0)
+        axes[1, 2].bar(x + idx*width, bin_means.values, width=width, yerr=bin_stds.values, capsize=5, color=color, alpha=0.8, label=label)
+
+    axes[1, 2].set_title('Bin Mean Yield ± Std')
+    axes[1, 2].set_xlabel('Bin')
+    axes[1, 2].set_ylabel('Mean Yield (kg/H)')
+    axes[1, 2].set_xticks(x + width)
+    axes[1, 2].set_xticklabels(bin_labels)
+    axes[1, 2].legend()
+
+    plt.tight_layout()
+    plt.show()
+
+# Prepare predictions and true labels for each model and split
+def plot_confusion_matrix(train_preds, val_preds, test_preds, train_targets, val_targets, test_targets):
+    model_name = "Presto"
+    split_names = ["Train", "Validation", "Test"]
+    model_preds = [train_preds.astype(int), val_preds.astype(int), test_preds.astype(int)]
+    model_trues = [train_targets, val_targets, test_targets]
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+    for col, split_name in enumerate(split_names):
+        y_true = model_trues[col]
+        y_pred = model_preds[col]
+        # Convert boolean to int if needed
+        if y_pred.dtype == bool:
+            y_pred = y_pred.astype(int)
+        if y_true.dtype == bool:
+            y_true = y_true.astype(int)
+        cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axes[col], cbar=False,
+                    xticklabels=["Low", "High"], yticklabels=["Low", "High"])
+        axes[col].set_xlabel('Predicted')
+        axes[col].set_ylabel('True')
+        axes[col].set_title(f"{model_name} - {split_name}")
+
+    plt.tight_layout()
+    plt.show()
+    
+def plot_yield_prediction_vs_target(
+        train_preds, 
+        val_preds,
+        test_preds, 
+        train_targets, 
+        val_targets, 
+        test_targets, 
+        train_df,
+        val_df,
+        test_df,
+        target_name="Yield kg/H", 
+        bin_th=1220):
+    plot_data = [
+        (
+            "Presto",
+            [train_targets, val_targets, test_targets],
+            [train_preds.astype(int), val_preds.astype(int), test_preds.astype(int)],
+            [train_df[target_name].values, val_df[target_name].values, test_df[target_name].values],
+        ),
+    ]
+
+    col_titles = ["Train", "Validation", "Test"]
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5), sharex=False, sharey=True)
+
+    for row, (model_name, y_trues, y_preds, yields) in enumerate(plot_data):
+        for col in range(3):
+            ax = axes[col]
+            y_true = y_trues[col]
+            y_pred = y_preds[col]
+            yield_vals = yields[col]
+            correct = (y_true == y_pred)
+            # Plot correct in blue, incorrect in red
+            ax.scatter(
+                np.arange(len(yield_vals))[~correct], yield_vals[~correct], 
+                c="red", label="Incorrect", alpha=0.7, marker="x"
+            )
+            ax.scatter(
+                np.arange(len(yield_vals))[correct], yield_vals[correct], 
+                c="blue", label="Correct", alpha=0.7, marker="o"
+            )
+            # Draw the bin threshold line and always show its label in the legend
+            ax.axhline(bin_th, color="black", linestyle="--", label="Low/High threshold")
+            ax.set_title(f"{model_name} - {col_titles[col]}")
+            ax.set_xlabel("Sample Index")
+            if col == 0:
+                ax.set_ylabel(target_name)
+            if row == 0 and col == 2:
+                ax.legend(loc="upper right")
+
+def get_spatial_and_temporal_extents(extent, start_date, end_date, epsg=4326):
+    minx, miny, maxx, maxy = extent.total_bounds
+    spatial_context = BoundingBoxExtent(
+        west = float(minx),
+        south = float(miny),
+        east = float(maxx),
+        north = float(maxy),
+        epsg=epsg
+    )
+    start_date = datetime.strptime(start_date, "%Y-%m-%d")
+    end_date = datetime.strptime(end_date, "%Y-%m-%d")
+    temporal_context = TemporalContext(start_date=start_date, end_date=end_date)
+    return spatial_context, temporal_context
