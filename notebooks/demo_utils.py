@@ -1,3 +1,4 @@
+from matplotlib.patches import Patch
 import pandas as pd
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
@@ -103,11 +104,10 @@ def plot_distribution(train_df, test_df, val_df, target_column):
     plt.tight_layout()
     plt.show()
 
-# Prepare predictions and true labels for each model and split
 def plot_confusion_matrix(train_preds, val_preds, test_preds, train_targets, val_targets, test_targets):
     model_name = "Presto"
     split_names = ["Train", "Validation", "Test"]
-    model_preds = [train_preds.astype(int), val_preds.astype(int), test_preds.astype(int)]
+    model_preds = [(preds > 0.5).astype(int) if preds.dtype == np.float32 else preds for preds in [train_preds, val_preds, test_preds]]
     model_trues = [train_targets, val_targets, test_targets]
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
@@ -115,11 +115,6 @@ def plot_confusion_matrix(train_preds, val_preds, test_preds, train_targets, val
     for col, split_name in enumerate(split_names):
         y_true = model_trues[col]
         y_pred = model_preds[col]
-        # Convert boolean to int if needed
-        if y_pred.dtype == bool:
-            y_pred = y_pred.astype(int)
-        if y_true.dtype == bool:
-            y_true = y_true.astype(int)
         cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axes[col], cbar=False,
                     xticklabels=["Low", "High"], yticklabels=["Low", "High"])
@@ -131,24 +126,24 @@ def plot_confusion_matrix(train_preds, val_preds, test_preds, train_targets, val
     plt.show()
     
 def plot_yield_prediction_vs_target(
-        train_preds, 
-        val_preds,
-        test_preds, 
-        train_targets, 
-        val_targets, 
-        test_targets, 
-        train_df,
-        val_df,
-        test_df,
-        target_name="Yield kg/H", 
-        bin_th=1220):
+    train_preds, 
+    val_preds,
+    test_preds, 
+    train_targets, 
+    val_targets, 
+    test_targets, 
+    train_df,
+    val_df,
+    test_df,
+    target_name="Yield kg/H", 
+    bin_th=1220):
     plot_data = [
-        (
-            "Presto",
-            [train_targets, val_targets, test_targets],
-            [train_preds.astype(int), val_preds.astype(int), test_preds.astype(int)],
-            [train_df[target_name].values, val_df[target_name].values, test_df[target_name].values],
-        ),
+    (
+        "Presto",
+        [train_targets, val_targets, test_targets],
+        [train_preds, val_preds, test_preds],
+        [train_df[target_name].values, val_df[target_name].values, test_df[target_name].values],
+    ),
     ]
 
     col_titles = ["Train", "Validation", "Test"]
@@ -161,24 +156,30 @@ def plot_yield_prediction_vs_target(
             y_true = y_trues[col]
             y_pred = y_preds[col]
             yield_vals = yields[col]
-            correct = (y_true == y_pred)
-            # Plot correct in blue, incorrect in red
-            ax.scatter(
-                np.arange(len(yield_vals))[~correct], yield_vals[~correct], 
-                c="red", label="Incorrect", alpha=0.7, marker="x"
-            )
-            ax.scatter(
-                np.arange(len(yield_vals))[correct], yield_vals[correct], 
-                c="blue", label="Correct", alpha=0.7, marker="o"
-            )
+            # y_pred_int = (y_pred > 0.5).astype(int) if np.issubdtype(y_pred.dtype, np.floating) else y_pred.astype(int)
+            scatter = ax.scatter(
+                np.arange(len(yield_vals)),
+                yield_vals,
+                c=y_pred,
+                cmap="coolwarm",
+                vmin=0,
+                vmax=1,
+                alpha=0.7,
+                marker="o",
+                )
             # Draw the bin threshold line and always show its label in the legend
             ax.axhline(bin_th, color="black", linestyle="--", label="Low/High threshold")
             ax.set_title(f"{model_name} - {col_titles[col]}")
             ax.set_xlabel("Sample Index")
-            if col == 0:
-                ax.set_ylabel(target_name)
-            if row == 0 and col == 2:
-                ax.legend(loc="upper right")
+        if col == 0:
+            ax.set_ylabel(target_name)
+        if row == 0 and col == 2:
+            legend_elements = [
+                Patch(facecolor=plt.cm.coolwarm(0.0), label="Low Yield"),
+                Patch(facecolor=plt.cm.coolwarm(1.0), label="High Yield"),
+                plt.Line2D([0], [0], color="black", linestyle="--", label="Low/High threshold"),
+            ]
+        ax.legend(handles=legend_elements, loc="upper right")
 
 def get_spatial_and_temporal_extents(extent, start_date, end_date, epsg=4326):
     minx, miny, maxx, maxy = extent.total_bounds
