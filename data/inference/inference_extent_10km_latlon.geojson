@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "inference_extent_10km_latlon",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "id": 1, "left": 746442.8783, "top": 1077877.3588, "right": 756442.8783, "bottom": 1067877.3588, "row_index": 0, "col_index": 0 }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ -0.75362720015368, 9.743556743570414 ], [ -0.662526655561731, 9.74294461212283 ], [ -0.663152884392453, 9.652572970072969 ], [ -0.754229073417907, 9.653179318491732 ], [ -0.75362720015368, 9.743556743570414 ] ] ] ] } }
+]
+}
