@@ -79,8 +79,8 @@ def plot_distribution(train_df, test_df, val_df, target_column):
         bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
         axes[0, 2].bar(bin_centers + i*width - width, hist, width=width, alpha=0.7, color=color, label=label, align='center')
         # x_ticks = [bin_centers + i*width]
-    axes[0, 2].set_title('Yield kg/H')
-    axes[0, 2].set_xlabel('Yield kg/H')
+    axes[0, 2].set_title('Bin Yield kg/H')
+    # axes[0, 2].set_xlabel('Yield kg/H')
     # axes[0, 2].set_xticks(x_ticks)
     axes[0, 2].set_xticklabels(['', '', 'Low', '', '', '', 'High', ''])
     axes[0, 2].set_ylabel('Frequency')
