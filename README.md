@@ -31,7 +31,7 @@ GEOMaize/
 
 ## Notebooks Overview
 
-### 1. `GEOMaize_maize_yield_prediction.ipynb` — *Start here*
+### 1. `GEOMaize_maize_yield_prediction.ipynb` — *End-to-end pipeline*
 The **main end-to-end notebook** for demonstrating the full pipeline:
 - Loads and explores yield field data (157 field-year records, Ghana 2021–2025)
 - Binarizes yield at the 1220 kg/H threshold (Low / High classes)
@@ -105,16 +105,6 @@ pip install git+https://github.com/ScaleAGData/scaleag-vito.git@prometheo-integr
 # 4. Register the kernel for Jupyter
 ipython kernel install --user --name=geomaize
 ```
-
----
-
-### Option C — Existing conda/mamba environment
-
-```bash
-pip install git+https://github.com/ScaleAGData/scaleag-vito.git@prometheo-integration
-```
-
----
 
 ## Data
 
