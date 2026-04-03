@@ -2,11 +2,13 @@ from matplotlib.patches import Patch
 import pandas as pd
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import seaborn as sns
 import numpy as np
 from openeo_gfmap import BoundingBoxExtent
 from openeo_gfmap import TemporalContext
 from datetime import datetime
+import xarray as xr
 
 def plot_distribution(train_df, test_df, val_df, target_column):
     # Create a figure with subplots for the value counts including train/test/val splits
@@ -194,3 +196,68 @@ def get_spatial_and_temporal_extents(extent, start_date, end_date, epsg=4326):
     end_date = datetime.strptime(end_date, "%Y-%m-%d")
     temporal_context = TemporalContext(start_date=start_date, end_date=end_date)
     return spatial_context, temporal_context
+
+def min_max_normalize(image, gamma=1.0):
+    # normalize image and set NaNs to NODATA value
+    image = np.nan_to_num(image, 65535).astype("uint16")
+    image = (image - image.min()) / (image.max() - image.min()) * gamma
+    image = np.clip(image, 0, 1)  # Ensure values are between 0 and 1 after applying gamma
+    return image
+
+def plot_results(
+        path_to_input_file, 
+        prob_map=None, 
+        bin_th=0.5,
+        ts_index=0,
+        coords = None, 
+        rgb_gamma=1.0,
+        prob_cmap="Greens", 
+        ):
+
+    ts_index=3
+    rgb_gamma=1 
+    rgb = xr.load_dataset(path_to_input_file)
+    if coords is not None:
+        rgb = rgb.isel(x=slice(coords[0], coords[2]), y=slice(coords[1], coords[3]))
+    bands = ["S2-L2A-B04", "S2-L2A-B03", "S2-L2A-B02"]
+    rgb = np.stack([rgb[band].values for band in bands], axis=-1)[ts_index]
+
+    fig = plt.figure(figsize=(15, 5))
+    gs = gridspec.GridSpec(1, 4, width_ratios=[1, 1, 1, 0.05], wspace=0.1)
+
+    axs = [fig.add_subplot(gs[i]) for i in range(3)]
+    cax = fig.add_subplot(gs[3])  # dedicated colorbar axis
+
+    axs[0].imshow(min_max_normalize(rgb, gamma=rgb_gamma))
+    axs[0].set_title("RGB")
+    axs[0].axis("off")
+
+    rgb_prediction_map = np.zeros((*prob_map.shape, 3), dtype=np.float32)
+    rgb_prediction_map[rgb_prediction_map == 0] = np.nan
+
+    valid_mask = prob_map != 0
+    high_mask = valid_mask & (prob_map > bin_th)
+    low_mask = valid_mask & (prob_map <= bin_th)
+
+    rgb_prediction_map[high_mask] = [0, 1, 0]  # green
+    rgb_prediction_map[low_mask] = [1, 0, 0]   # red
+
+    # Replace only fully black pixels ([0, 0, 0]) with RGB background values
+    background_mask = np.all(np.isnan(rgb_prediction_map), axis=-1)
+    rgb_bg = rgb.astype(np.float32)
+    if np.nanmax(rgb_bg) > 1:
+        rgb_bg = rgb_bg / np.nanmax(rgb_bg)
+
+    rgb_prediction_map[background_mask] = rgb_bg[background_mask]
+    axs[1].imshow(rgb_prediction_map)
+    axs[1].set_title(f"Prediction Map > {bin_th}")
+    axs[1].axis("off")
+
+
+    im = axs[2].imshow(prob_map, cmap=prob_cmap, vmin=0, vmax=1)
+    axs[2].set_title("Probability Map")
+    axs[2].axis("off")
+
+    cbar = fig.colorbar(im, cax=cax)
+    cbar.set_ticks(np.arange(0, 1.1, 0.1))
+    plt.show()
